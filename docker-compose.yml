@@ -1,0 +1,120 @@
+version: '3.3'
+services:
+
+  mqtt-broker:
+    build:
+      dockerfile: Dockerfile
+      context: ./mqtt
+    restart: always
+    ports: 
+      - 1883:1883
+      - 9001:9001
+    networks: 
+      - vNet
+    volumes:
+      - mqttdata:/mosquitto/data
+      - mqttlog:/mosquitto/log eclipse-mosquitto
+
+  node-red:
+    container_name: node-red
+    image: nodered/node-red
+    restart: always
+    networks: 
+      - vNet
+    ports:
+      - 1880:1880
+    volumes:
+      - ./node-red:/data
+
+  neo4j:
+    image: neo4j:latest
+    hostname: neo4j
+    container_name: neo4j
+    ports:
+      - "7474:7474"
+      - "7687:7687"
+    depends_on:
+      - kafka
+    networks: 
+      - vNet
+    volumes:
+      - ./neo4j/plugins:/plugins
+    restart: on-failure
+    command: neo4j
+    environment:
+      NEO4J_AUTH: neo4j/streams
+
+  zookeeper:
+    image: confluentinc/cp-zookeeper:latest
+    hostname: zookeeper
+    container_name: zookeeper
+    restart: always
+    networks: 
+      - vNet
+    ports:
+      - "12181:12181"
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 12181
+
+  kafka:
+    image: confluentinc/cp-kafka:latest
+    hostname: kafka
+    container_name: kafka
+    restart: always
+    ports:
+      - "19092:19092"
+    depends_on:
+      - zookeeper
+    networks: 
+        - vNet
+    environment:
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:12181
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:19092
+  
+  go-neo4j:
+    container_name: "go-neo4j"
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    volumes: 
+      - "./backend:/go/src/app"
+    depends_on: 
+      - "neo4j"
+    networks: 
+      - vNet
+      
+  go-route-creator:
+    container_name: "go-route-creator"
+    build:
+      context: ./route_creator
+      dockerfile: Dockerfile
+    volumes: 
+      - "./route_creator:/go/src/app"
+    depends_on: 
+      - "neo4j"
+    networks: 
+      - vNet
+
+  anomaly-detection:
+    container_name: "anomaly-detection"
+    build:
+      context: ./anomaly-detection
+      dockerfile: Dockerfile
+    volumes: 
+      - "./anomaly-detection:/go/src/app"
+    ports: 
+      - 8080:8080
+    depends_on: 
+      - "neo4j"
+    networks: 
+      - vNet
+        
+networks:
+  vNet:
+    driver: bridge
+
+volumes:
+  myNodeREDdata:
+  mqttdata:
+  mqttlog:
