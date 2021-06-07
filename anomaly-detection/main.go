@@ -18,13 +18,12 @@ type Neo4jConfiguration struct {
 	Database string
 }
 
-// type Bus struct {
-// 	Name string
-// 	// current location
-// 	Timestamp int
-// 	Lon       string
-// 	Lat       string
-// }
+type Anomaly struct {
+	BusName   string
+	Timestamp int64
+	Lon       float64
+	Lat       float64
+}
 
 func busAnomalyDetection(driver neo4j.Driver, busName string) func(http.ResponseWriter, *http.Request) {
 	return func(w http.ResponseWriter, req *http.Request) {
@@ -35,7 +34,10 @@ func busAnomalyDetection(driver neo4j.Driver, busName string) func(http.Response
 		})
 		defer unsafeClose(session)
 
+		bus, err := neo4j.Collect(session.Run("MATCH (b:Bus) WHERE b.name=$bus_name RETURN b.timestamp, b.lon, b.lat", map[string]interface{}{"bus_name": busName}))
+
 		routeName := ""
+		tx := ""
 		if busName == "Bus 1" {
 			routeName = "Route A"
 		} else if busName == "Bus 2" {
@@ -44,62 +46,39 @@ func busAnomalyDetection(driver neo4j.Driver, busName string) func(http.Response
 			routeName = "Route C"
 		}
 
-		var anomaly []string
+		tx = "MATCH (b:Bus) WHERE b.name = '" + busName + "' MATCH (:Route{name: '" + routeName + "'})-[r:LOCATED]-(l) " +
+			"RETURN round(distance(point({longitude: b.lon, latitude: b.lat}),point({longitude: l.lon, latitude: l.lat}))) as dist"
 
-		// bus, err := neo4j.Collect(session.Run("MATCH (b:Bus) WHERE b.name=$bus_name RETURN b.lon, b.lat", map[string]interface{}{"bus_name": busName}))
+		anomaly := []Anomaly{}
+		adValues, _ := neo4j.Collect(session.Run(tx, nil))
 
-		// ad, err := neo4j.Collect(session.Run("MATCH (b:Bus) WHERE b.name=$bus_name"+
-		// 	"MATCH (:Route{name:$route_name})-[r:LOCATED]-(l)"+
-		// 	"WITH point({longitude: b.lon, latitude: b.lat}) as p1, point({longitude: l.lon, latitude: l.lat}) as p2"+
-		// 	"RETURN round(distance(p1,p2)) as dist", map[string]interface{}{"bus_name": busName, "route_name": routeName}))
+		var arr []int
+		for _, ad_val := range adValues {
+			// fmt.Printf("\nThe type of ad_val.Values[0] is : %T", ad_val.Values[0])
+			// fmt.Printf("\nThe type of ad_val is : %T", ad_val)
+			distance := int(ad_val.Values[0].(float64))
+			arr = append(arr, distance)
+		}
 
-		fmt.Println(routeName)
+		fmt.Println(arr)
 
-		adValues, err := neo4j.Collect(session.Run(
-			"MATCH (b:Bus) WHERE b.name='Bus 1'"+
-				"MATCH (:Route{name:'Route A'})-[r:LOCATED]-(l)"+
-				"WITH point({longitude: b.lon, latitude: b.lat}) as p1, point({longitude: l.lon, latitude: l.lat}) as p2"+
-				"RETURN round(distance(p1,p2)) as dist",
-			map[string]interface{}{}))
-
-		fmt.Println(adValues)
-
-		// for _, ad_val := range ad {
-		// anomaly = append(anomaly, ad_val.Values[0].(string))
-		// if ad_val.Values[0] < 100 {
-		// 	for _, bus_val := range bus {
-
-		// 		anomaly = append(anomaly, busName)
-		// 		anomaly = append(anomaly, bus_val.Values[0].(string))
-		// 		anomaly = append(anomaly, bus_val.Values[1].(string))
-		// 		anomaly = append(anomaly, ad_val.Values[0].(string))
-		// 	}
-		// }
-		// }
-
-		// bus, err := neo4j.Collect(session.Run("MATCH (b:Bus) WHERE b.name=$bus_name RETURN b.lon, b.lat", map[string]interface{}{"bus_name": busName}))
-		// //Bus 1 current location - (Route a all location) < 100
-		// if err != nil {
-		// 	fmt.Println(err)
-		// }
 		// for _, val := range bus {
-		// 	fmt.Println("0: ", val.Values[0])
-		// 	fmt.Println("1: ", val.Values[1])
-		// 	list = append(list, val.Values[0].(string))
-		// 	list = append(list, val.Values[1].(string))
+		// 	fmt.Println(val.Values[0].(int64))
+		// 	fmt.Println(val.Values[1].(float64))
+		// 	fmt.Println(val.Values[2].(float64))
 		// }
 
-		// routeAllLocation, err := neo4j.Collect(session.Run("MATCH (:Route{name:$route_name})-[r:LOCATED]-(b) RETURN b.lon, b.lat", map[string]interface{}{"route_name": routeName}))
+		if !contains(arr, 100) {
+			for _, val := range bus {
+				n := Anomaly{BusName: busName, Timestamp: val.Values[0].(int64), Lon: val.Values[1].(float64), Lat: val.Values[2].(float64)}
+				anomaly = append(anomaly, n)
+			}
+		}
 
-		// for _, val := range routeAllLocation {
-
-		// 	fmt.Println("route 0: ", val.Values[0])
-		// 	// fmt.Println("route 1: ", val.Values[1])
-
-		// }
-
-		// fmt.Println("list 0: ", list[0])
-		// fmt.Println("list 1: ", list[1])
+		if err != nil {
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
 
 		busJSON, err := json.Marshal(anomaly)
 		if err != nil {
@@ -111,6 +90,15 @@ func busAnomalyDetection(driver neo4j.Driver, busName string) func(http.Response
 	}
 }
 
+func contains(s []int, e int) bool {
+	for _, a := range s {
+		if a < e {
+			return true
+		}
+	}
+	return false
+}
+
 func main() {
 	configuration := parseConfiguration()
 	driver, err := configuration.newDriver()
@@ -119,9 +107,7 @@ func main() {
 	}
 	defer unsafeClose(driver)
 
-	log.Println("busAnomalyDetection")
 	http.HandleFunc("/", busAnomalyDetection(driver, "Bus 1"))
-	log.Println("-------------------------------------")
 	http.ListenAndServe(":8080", nil)
 
 }
