@@ -73,9 +73,9 @@ func addStopsAsRoute(driver neo4j.Driver, route Route) (int, error) {
 
 	tx := ""
 	if route.Name == "Route A" {
-		tx = "MATCH (s:Stop) WHERE s.name='Visnelik' OR s.name='MEB'  OR s.name='OGU IIBF' RETURN s.name AS name"
+		tx = "MATCH (s:Stop) WHERE s.name='Visnelik' OR s.name='MEB'  OR s.name='OGU IIBF' OR s.name='Ataturk Bulv' RETURN s.name AS name"
 	} else if route.Name == "Route B" {
-		tx = "MATCH (s:Stop) WHERE s.name='Ogretmen Evi' OR s.name='MEB'  OR s.name='OGU IIBF' RETURN s.name AS name"
+		tx = "MATCH (s:Stop) WHERE s.name='Ogretmen Evi' OR s.name='MEB'  OR s.name='OGU IIBF' OR s.name='Ataturk Bulv' RETURN s.name AS name"
 	} else if route.Name == "Route C" {
 		tx = "MATCH (s:Stop) WHERE s.name='OGU IIBF' OR s.name='Buyukdere' OR s.name='Goztepe' OR s.name='Odunpazari' RETURN s.name AS name"
 	}
@@ -212,6 +212,7 @@ func initialize(driver neo4j.Driver) {
 	stop5 := Stop{"Visnelik", 39.764613, 30.499905}
 	stop6 := Stop{"Ogretmen Evi", 39.764992, 30.511165}
 	stop7 := Stop{"Odunpazari", 39.764992, 30.511165}
+	stop8 := Stop{"Ataturk Bulv", 39.764647, 30.500208}
 
 	addStopInTxFunc(driver, stop1)
 	addStopInTxFunc(driver, stop2)
@@ -220,6 +221,7 @@ func initialize(driver neo4j.Driver) {
 	addStopInTxFunc(driver, stop5)
 	addStopInTxFunc(driver, stop6)
 	addStopInTxFunc(driver, stop7)
+	addStopInTxFunc(driver, stop8)
 
 	// add route node
 	routeA := Route{"Route A"}

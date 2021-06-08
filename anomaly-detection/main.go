@@ -17,15 +17,15 @@ type Neo4jConfiguration struct {
 	Password string
 	Database string
 }
-
 type Anomaly struct {
-	BusName   string
-	Timestamp int64
-	Lon       float64
-	Lat       float64
+	BusName     string
+	Timestamp   int64
+	Lon         float64
+	Lat         float64
+	MinDistance int64
 }
 
-func busAnomalyDetection(driver neo4j.Driver, busName string) func(http.ResponseWriter, *http.Request) {
+func getAnomaly(driver neo4j.Driver) func(http.ResponseWriter, *http.Request) {
 	return func(w http.ResponseWriter, req *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		session := driver.NewSession(neo4j.SessionConfig{
@@ -33,47 +33,33 @@ func busAnomalyDetection(driver neo4j.Driver, busName string) func(http.Response
 			DatabaseName: "neo4j",
 		})
 		defer unsafeClose(session)
+		anomalyDetection(driver)
 
-		bus, err := neo4j.Collect(session.Run("MATCH (b:Bus) WHERE b.name=$bus_name RETURN b.timestamp, b.lon, b.lat", map[string]interface{}{"bus_name": busName}))
-
-		routeName := ""
-		tx := ""
-		if busName == "Bus 1" {
-			routeName = "Route A"
-		} else if busName == "Bus 2" {
-			routeName = "Route B"
-		} else if busName == "Bus 3" || busName == "Bus 4" {
-			routeName = "Route C"
-		}
-
-		tx = "MATCH (b:Bus) WHERE b.name = '" + busName + "' MATCH (:Route{name: '" + routeName + "'})-[r:LOCATED]-(l) " +
-			"RETURN round(distance(point({longitude: b.lon, latitude: b.lat}),point({longitude: l.lon, latitude: l.lat}))) as dist"
-
+		cmd := "MATCH (a:Anomaly) RETURN a.name, a.timestamp, a.lon, a.lat, a.minDist"
+		ad, err := neo4j.Collect(session.Run(cmd, nil))
 		anomaly := []Anomaly{}
-		adValues, _ := neo4j.Collect(session.Run(tx, nil))
 
-		var arr []int
-		for _, ad_val := range adValues {
-			// fmt.Printf("\nThe type of ad_val.Values[0] is : %T", ad_val.Values[0])
-			// fmt.Printf("\nThe type of ad_val is : %T", ad_val)
-			distance := int(ad_val.Values[0].(float64))
-			arr = append(arr, distance)
+		for _, val := range ad {
+			fmt.Printf("\nThe type of 0 is : %T", val.Values[0])
+			fmt.Printf("\nThe type of 1 is : %T", val.Values[1])
+			fmt.Printf("\nThe type of 2 is : %T", val.Values[2])
+			fmt.Printf("\nThe type of 3 is : %T", val.Values[3])
+			fmt.Printf("\nThe type of 4 is : %T", val.Values[4])
+
+			anomaly = append(anomaly, Anomaly{
+				BusName:     val.Values[0].(string),
+				Timestamp:   val.Values[1].(int64),
+				Lon:         val.Values[2].(float64),
+				Lat:         val.Values[3].(float64),
+				MinDistance: val.Values[4].(int64),
+			})
 		}
 
-		fmt.Println(arr)
-
-		// for _, val := range bus {
-		// 	fmt.Println(val.Values[0].(int64))
-		// 	fmt.Println(val.Values[1].(float64))
-		// 	fmt.Println(val.Values[2].(float64))
-		// }
-
-		if !contains(arr, 100) {
-			for _, val := range bus {
-				n := Anomaly{BusName: busName, Timestamp: val.Values[0].(int64), Lon: val.Values[1].(float64), Lat: val.Values[2].(float64)}
-				anomaly = append(anomaly, n)
-			}
-		}
+		fmt.Println("-------------------------------------")
+		fmt.Println("-------------------------------------")
+		fmt.Println(anomaly)
+		fmt.Println("-------------------------------------")
+		fmt.Println("-------------------------------------")
 
 		if err != nil {
 			w.WriteHeader(http.StatusInternalServerError)
@@ -85,9 +71,80 @@ func busAnomalyDetection(driver neo4j.Driver, busName string) func(http.Response
 			w.WriteHeader(http.StatusInternalServerError)
 			return
 		}
-
 		w.Write(busJSON)
 	}
+}
+
+func anomalyDetection(driver neo4j.Driver) error {
+	session := driver.NewSession(neo4j.SessionConfig{
+		AccessMode:   neo4j.AccessModeRead,
+		DatabaseName: "neo4j",
+	})
+	defer unsafeClose(session)
+
+	for i := 0; i < 4; i++ {
+
+		fmt.Println("---Anomaly Detection---")
+
+		cmd := ""
+		routeName := ""
+		busName := ""
+
+		if i == 0 {
+			busName = "Bus 1"
+			routeName = "Route A"
+		} else if i == 1 {
+			busName = "Bus 2"
+			routeName = "Route B"
+		} else if i == 2 {
+			busName = "Bus 3"
+			routeName = "Route C"
+		} else if i == 3 {
+			busName = "Bus 4"
+			routeName = "Route C"
+		}
+
+		cmd = "MATCH (b:Bus) WHERE b.name = '" + busName + "' MATCH (:Route{name: '" + routeName + "'})-[r:LOCATED]-(l) " +
+			"RETURN round(distance(point({longitude: b.lon, latitude: b.lat}),point({longitude: l.lon, latitude: l.lat}))) as dist"
+
+		adValues, _ := neo4j.Collect(session.Run(cmd, nil))
+
+		var arr []int
+		for _, ad_val := range adValues {
+			distance := int(ad_val.Values[0].(float64))
+			arr = append(arr, distance)
+		}
+
+		fmt.Println(arr)
+		bus, err := neo4j.Collect(session.Run("MATCH (b:Bus) WHERE b.name=$bus_name RETURN b.timestamp, b.lon, b.lat",
+			map[string]interface{}{"bus_name": busName}))
+
+		// that's anomaly
+		if !contains(arr, 100) {
+			for _, val := range bus {
+
+				cmd := fmt.Sprint("MERGE (a:Anomaly {name: '", busName, "', timestamp:", val.Values[0].(int64), ", lon: ",
+					val.Values[1].(float64), ", lat: ", val.Values[2].(float64), ", minDist: ", minDistance(arr), "})")
+
+				ad, err := session.WriteTransaction(func(tx neo4j.Transaction) (interface{}, error) {
+					return tx.Run(cmd, nil)
+				})
+
+				if err != nil {
+					return err
+				}
+				fmt.Println(ad)
+			}
+		}
+
+		if err != nil {
+			return err
+		}
+
+		fmt.Println("---End Anomaly Detection---")
+
+	}
+	return nil
 }
 
 func contains(s []int, e int) bool {
@@ -99,6 +156,16 @@ func contains(s []int, e int) bool {
 	return false
 }
 
+func minDistance(values []int) int {
+	min := values[0]
+	for _, v := range values {
+		if v < min {
+			min = v
+		}
+	}
+	return min
+}
+
 func main() {
 	configuration := parseConfiguration()
 	driver, err := configuration.newDriver()
@@ -107,9 +174,10 @@ func main() {
 	}
 	defer unsafeClose(driver)
 
-	http.HandleFunc("/", busAnomalyDetection(driver, "Bus 1"))
-	http.ListenAndServe(":8080", nil)
+	anomalyDetection(driver)
 
+	http.HandleFunc("/", getAnomaly(driver))
+	http.ListenAndServe(":8080", nil)
 }
 
 //newDrive is a method for Neo4jConfiguration to return a connection to the DB
