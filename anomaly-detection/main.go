@@ -40,12 +40,6 @@ func getAnomaly(driver neo4j.Driver) func(http.ResponseWriter, *http.Request) {
 		anomaly := []Anomaly{}
 
 		for _, val := range ad {
-			fmt.Printf("\nThe type of 0 is : %T", val.Values[0])
-			fmt.Printf("\nThe type of 1 is : %T", val.Values[1])
-			fmt.Printf("\nThe type of 2 is : %T", val.Values[2])
-			fmt.Printf("\nThe type of 3 is : %T", val.Values[3])
-			fmt.Printf("\nThe type of 4 is : %T", val.Values[4])
-
 			anomaly = append(anomaly, Anomaly{
 				BusName:     val.Values[0].(string),
 				Timestamp:   val.Values[1].(int64),
@@ -54,12 +48,6 @@ func getAnomaly(driver neo4j.Driver) func(http.ResponseWriter, *http.Request) {
 				MinDistance: val.Values[4].(int64),
 			})
 		}
-
-		fmt.Println("-------------------------------------")
-		fmt.Println("-------------------------------------")
-		fmt.Println(anomaly)
-		fmt.Println("-------------------------------------")
-		fmt.Println("-------------------------------------")
 
 		if err != nil {
 			w.WriteHeader(http.StatusInternalServerError)
