@@ -51,6 +51,7 @@ type Garage struct {
 	Lat  float32
 }
 
+// Durak noktalarının Neo4jye eklendiği fonksiyondur.
 func addStopInTxFunc(driver neo4j.Driver, stop Stop) error {
 	session := driver.NewSession(neo4j.SessionConfig{AccessMode: neo4j.AccessModeWrite})
 	defer session.Close()
@@ -67,6 +68,7 @@ func addStopInTxFunc(driver neo4j.Driver, stop Stop) error {
 	return err
 }
 
+// Rotalar oluşturulur ve duraklar ile rotalar arasında ilişkiler tanımlanır.
 func addStopsAsRoute(driver neo4j.Driver, route Route) (int, error) {
 	session := driver.NewSession(neo4j.SessionConfig{AccessMode: neo4j.AccessModeWrite})
 	defer session.Close()
@@ -104,6 +106,7 @@ func addStopsAsRoute(driver neo4j.Driver, route Route) (int, error) {
 	return stopCount, nil
 }
 
+// Otobüsler oluşturulur ve otobüsler ile rotalar arasında ilişkiler tanımlanır.
 func addRoutesAsBus(driver neo4j.Driver, bus Bus) (int, error) {
 	session := driver.NewSession(neo4j.SessionConfig{AccessMode: neo4j.AccessModeWrite})
 	defer session.Close()
@@ -141,33 +144,7 @@ func addRoutesAsBus(driver neo4j.Driver, bus Bus) (int, error) {
 	return routeCount, nil
 }
 
-func addLocationToBus(driver neo4j.Driver, busName string, timestamp int, lon float32, lat float32) (int, error) {
-	session := driver.NewSession(neo4j.SessionConfig{AccessMode: neo4j.AccessModeWrite})
-	defer session.Close()
-
-	fmt.Println("----------------------------")
-	fmt.Println("----Add Location for Bus----")
-	fmt.Println("----------------------------")
-
-	_, err := session.WriteTransaction(func(tx neo4j.Transaction) (interface{}, error) {
-		return tx.Run("MATCH (b:Bus {name: $bus_name}) "+
-			"SET b.timestamp = $bus_ts, b.lon = $bus_lon, b.lat = $bus_lat",
-			map[string]interface{}{"bus_name": busName, "bus_ts": timestamp, "bus_lon": lon, "bus_lat": lat})
-	})
-
-	_, err = session.WriteTransaction(func(tx neo4j.Transaction) (interface{}, error) {
-		return tx.Run("MATCH (b:Bus {name: $bus_name}) "+
-			"MERGE (l:Location {timestamp: $bus_ts, lon: $bus_lon, lat: $bus_lat }) "+
-			"MERGE (b)-[:LOCATED]->(l)", map[string]interface{}{"bus_name": busName, "bus_ts": timestamp, "bus_lon": lon, "bus_lat": lat})
-	})
-
-	if err != nil {
-		return 0, err
-	}
-
-	return 1, nil
-}
-
+// Garajlar oluşturulur ve otobüsler ile garajlar arasında ilişkiler tanımlanır.
 func addBusAsGarage(driver neo4j.Driver, garage Garage) (int, error) {
 	session := driver.NewSession(neo4j.SessionConfig{AccessMode: neo4j.AccessModeWrite})
 	defer session.Close()
@@ -202,9 +179,36 @@ func addBusAsGarage(driver neo4j.Driver, garage Garage) (int, error) {
 	return busCount, nil
 }
 
-func initialize(driver neo4j.Driver) {
+// Otobüs için kafka consumerdan anlık olarak gelen konumlar kayıt edilmektedir.
+func addLocationToBus(driver neo4j.Driver, busName string, timestamp int, lon float32, lat float32) (int, error) {
+	session := driver.NewSession(neo4j.SessionConfig{AccessMode: neo4j.AccessModeWrite})
+	defer session.Close()
 
-	// add stop node
+	fmt.Println("----------------------------")
+	fmt.Println("----Add Location for Bus----")
+	fmt.Println("----------------------------")
+
+	_, err := session.WriteTransaction(func(tx neo4j.Transaction) (interface{}, error) {
+		return tx.Run("MATCH (b:Bus {name: $bus_name}) "+
+			"SET b.timestamp = $bus_ts, b.lon = $bus_lon, b.lat = $bus_lat",
+			map[string]interface{}{"bus_name": busName, "bus_ts": timestamp, "bus_lon": lon, "bus_lat": lat})
+	})
+
+	_, err = session.WriteTransaction(func(tx neo4j.Transaction) (interface{}, error) {
+		return tx.Run("MATCH (b:Bus {name: $bus_name}) "+
+			"MERGE (l:Location {timestamp: $bus_ts, lon: $bus_lon, lat: $bus_lat }) "+
+			"MERGE (b)-[:LOCATED]->(l)", map[string]interface{}{"bus_name": busName, "bus_ts": timestamp, "bus_lon": lon, "bus_lat": lat})
+	})
+
+	if err != nil {
+		return 0, err
+	}
+
+	return 1, nil
+}
+
+// Neo4j için initialize işlemi gerçekleştirilmektedir. Duraklar, otobüsler, rotalar ve garajlar için ilgili fonksiyonlar çağırılmaktadır.
+func initialize(driver neo4j.Driver) {
 	stop1 := Stop{"OGU IIBF", 39.752998, 30.486864}
 	stop2 := Stop{"Buyukdere", 39.752998, 30.486864}
 	stop3 := Stop{"Goztepe", 39.752998, 30.486864}
@@ -223,7 +227,6 @@ func initialize(driver neo4j.Driver) {
 	addStopInTxFunc(driver, stop7)
 	addStopInTxFunc(driver, stop8)
 
-	// add route node
 	routeA := Route{"Route A"}
 	routeB := Route{"Route B"}
 	routeC := Route{"Route C"}
@@ -238,7 +241,6 @@ func initialize(driver neo4j.Driver) {
 		return
 	}
 
-	// add bus node
 	bus1 := Bus{"Bus 1", 1633683332, 30.502349, 39.767360}
 	bus2 := Bus{"Bus 2", 1633683332, 39.751049, 30.477519}
 	bus3 := Bus{"Bus 3", 1633683332, 39.751049, 30.477519}
@@ -256,7 +258,6 @@ func initialize(driver neo4j.Driver) {
 		return
 	}
 
-	// add garage node
 	garage1 := Garage{"Garage 1", 39.751049, 30.477519}
 	g1, err5 := addBusAsGarage(driver, garage1)
 	fmt.Println(g1)
@@ -300,6 +301,7 @@ func main() {
 			fmt.Printf("Lon: %g\n", data.Lon)
 			fmt.Printf("Lat: %g\n", data.Lat)
 
+			// kafka consumerdan alınan veriler Neo4j'ye kaydedilmek üzere fonksiyona aktarılmaktadır.
 			addLocationToBus(driver, data.DeviceId, data.Timestamp, data.Lon, data.Lat)
 
 		} else {
@@ -310,7 +312,7 @@ func main() {
 	consumer.Close()
 }
 
-//newDrive is a method for Neo4jConfiguration to return a connection to the DB
+//neo4j bağlantıları ve ilgili konfigürasyon işlemleri yapılır.
 func (nc *Neo4jConfiguration) newDriver() (neo4j.Driver, error) {
 	return neo4j.NewDriver(nc.URL, neo4j.BasicAuth(nc.Username, nc.Password, ""))
 }

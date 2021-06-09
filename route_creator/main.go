@@ -29,6 +29,7 @@ type Trkpt struct {
 	Lon     float32  `xml:"lon,attr"`
 }
 
+// Xml dosyasından okunan konum verileri Neo4j'ye kaydedilmektedir.
 func addLocationToRoute(driver neo4j.Driver, routeName string, lon float32, lat float32) (int, error) {
 	session := driver.NewSession(neo4j.SessionConfig{AccessMode: neo4j.AccessModeWrite})
 	defer session.Close()
@@ -63,23 +64,20 @@ func main() {
 	parseXML("./xml/ibbf-visnelik.xml", driver)
 }
 
+// Gelen dosya adına göre rota bilgilerinin olduğu xml dosyası okunup Neo4j'ye kaydedilmektedir.
 func parseXML(file string, driver neo4j.Driver) {
 
 	xmlFile, err := os.Open(file)
 
-	// if we os.Open returns an error then handle it
 	if err != nil {
 		fmt.Println(err)
 	} else {
 		fmt.Println("Successfully Opened" + file)
 	}
 
-	// defer the closing of our xmlFile so that we can parse it later on
 	defer xmlFile.Close()
 
-	// read our opened xmlFile as a byte array.
 	byteValue, _ := ioutil.ReadAll(xmlFile)
-
 	var trkseg Trkseg
 	xml.Unmarshal(byteValue, &trkseg)
 
@@ -97,7 +95,7 @@ func parseXML(file string, driver neo4j.Driver) {
 	}
 }
 
-//newDrive is a method for Neo4jConfiguration to return a connection to the DB
+//neo4j bağlantıları ve ilgili konfigürasyon işlemleri yapılır.
 func (nc *Neo4jConfiguration) newDriver() (neo4j.Driver, error) {
 	return neo4j.NewDriver(nc.URL, neo4j.BasicAuth(nc.Username, nc.Password, ""))
 }

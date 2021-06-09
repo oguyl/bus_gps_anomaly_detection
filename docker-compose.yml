@@ -1,6 +1,7 @@
 version: '3.3'
 services:
 
+  # Mqtt broker docker servisidir. Mobil uygulamadan konum verilerini almak için kullanılmaktadır.
   mqtt-broker:
     container_name: mqtt-broker
     build:
@@ -16,6 +17,7 @@ services:
       - mqttdata:/mosquitto/data
       - mqttlog:/mosquitto/log eclipse-mosquitto
 
+  # Mobil uygulamadan gelen konum verilerini alıp kafka producer'a gönderdiğimiz akış tabanlı bir geliştirme aracıdır.
   node-red:
     container_name: node-red
     image: nodered/node-red
@@ -27,6 +29,7 @@ services:
     volumes:
       - ./node-red:/data
 
+  # Graph database Neo4j
   neo4j:
     image: neo4j:latest
     hostname: neo4j
@@ -57,6 +60,7 @@ services:
     environment:
       ZOOKEEPER_CLIENT_PORT: 12181
 
+  # Konum verilerini aktarmak için kullanılan kafka containerıdır. 
   kafka:
     image: confluentinc/cp-kafka:latest
     hostname: kafka
@@ -73,6 +77,7 @@ services:
       KAFKA_ZOOKEEPER_CONNECT: zookeeper:12181
       KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:19092
   
+  # Neo4j'ye durak, otobüs, rota ve garaj bilgilerinin eklendiği go modülüdür.
   go-neo4j:
     container_name: "go-neo4j"
     build:
@@ -84,7 +89,8 @@ services:
       - "neo4j"
     networks: 
       - vNet
-      
+  
+  # Neo4j'ye xml dosyalarında bulunan rotaların kaydedildiği go modülüdür.
   go-route-creator:
     container_name: "go-route-creator"
     build:
@@ -97,6 +103,7 @@ services:
     networks: 
       - vNet
 
+  # Anomali tespitinin yapıldığı go modülüdür.
   anomaly-detection:
     container_name: "anomaly-detection"
     build:
@@ -110,7 +117,8 @@ services:
       - "neo4j"
     networks: 
       - vNet
-        
+    
+# Containerların aralarında haberleşebilmesi için sanal bir network oluşturulmaktadır. 
 networks:
   vNet:
     driver: bridge

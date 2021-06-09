@@ -10,7 +10,6 @@ import (
 	"github.com/neo4j/neo4j-go-driver/v4/neo4j"
 )
 
-//Neo4jConfiguration holds the configuration for connecting to the DB
 type Neo4jConfiguration struct {
 	URL      string
 	Username string
@@ -24,6 +23,9 @@ type Anomaly struct {
 	Lat         float64
 	MinDistance int64
 }
+
+// Bu kısımda neo4j'de kayıtlı olan tüm anomaliler çekilir.
+// 8080 portundan gelen get isteği ile sorgulanabilir.
 
 func getAnomaly(driver neo4j.Driver) func(http.ResponseWriter, *http.Request) {
 	return func(w http.ResponseWriter, req *http.Request) {
@@ -63,6 +65,8 @@ func getAnomaly(driver neo4j.Driver) func(http.ResponseWriter, *http.Request) {
 	}
 }
 
+// Anomali tespiti yapılır. Otobüsün anlık konumu ile rota noktaları arasında neo4j distance fonksiyonu kullanılarak uzaklık ölçümü yapılır.
+// Ölçümlerin bulunduğu dizi 100'den küçük mesafe içerisiyorsa bir anomali olmadığına karar verilmektedir.
 func anomalyDetection(driver neo4j.Driver) error {
 	session := driver.NewSession(neo4j.SessionConfig{
 		AccessMode:   neo4j.AccessModeRead,
@@ -135,6 +139,7 @@ func anomalyDetection(driver neo4j.Driver) error {
 	return nil
 }
 
+// Uzaklık array'i içerisinde değer aramak için kullanılmaktadır.
 func contains(s []int, e int) bool {
 	for _, a := range s {
 		if a < e {
@@ -144,6 +149,7 @@ func contains(s []int, e int) bool {
 	return false
 }
 
+// Uzaklık array'i için en yakın mesafeyi bulmada kullanılır.
 func minDistance(values []int) int {
 	min := values[0]
 	for _, v := range values {
@@ -168,7 +174,7 @@ func main() {
 	http.ListenAndServe(":8080", nil)
 }
 
-//newDrive is a method for Neo4jConfiguration to return a connection to the DB
+//neo4j bağlantıları ve ilgili konfigürasyon işlemleri yapılır.
 func (nc *Neo4jConfiguration) newDriver() (neo4j.Driver, error) {
 	return neo4j.NewDriver(nc.URL, neo4j.BasicAuth(nc.Username, nc.Password, ""))
 }
