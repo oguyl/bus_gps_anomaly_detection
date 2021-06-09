@@ -26,7 +26,6 @@ type Anomaly struct {
 
 // Bu kısımda neo4j'de kayıtlı olan tüm anomaliler çekilir.
 // 8080 portundan gelen get isteği ile sorgulanabilir.
-
 func getAnomaly(driver neo4j.Driver) func(http.ResponseWriter, *http.Request) {
 	return func(w http.ResponseWriter, req *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
