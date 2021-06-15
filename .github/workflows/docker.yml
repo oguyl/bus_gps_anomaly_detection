@@ -33,7 +33,7 @@ jobs:
 
       - name: docker push
         run: |
-          docker push canerdikkollu/go-neo4j:$(date + %s)
-          docker push canerdikkollu/go-route-creator:$(date + %s)
-          docker push canerdikkollu/go-anomaly-detection:$(date + %s)
+          docker push canerdikkollu/go-neo4j
+          docker push canerdikkollu/go-route-creator
+          docker push canerdikkollu/go-anomaly-detection
 
