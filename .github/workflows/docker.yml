@@ -21,15 +21,15 @@ jobs:
       
       - name: docker build go-neo4j
         run: |
-          docker build ./backend -t canerdikkollu/go-neo4j:$(date + %s)
+          docker build ./backend --tag canerdikkollu/go-neo4j:$(date + %s)
           
       - name: docker build go-route-creator
         run: |
-          docker build ./backend -t canerdikkollu/go-route-creator:$(date + %s)
+          docker build ./backend --tag canerdikkollu/go-route-creator:$(date + %s)
           
       - name: docker build go-anomaly-detection
         run: |
-          docker build ./backend -t canerdikkollu/go-anomaly-detection:$(date + %s)
+          docker build ./backend --tag canerdikkollu/go-anomaly-detection:$(date + %s)
 
       - name: docker push
         run: |
