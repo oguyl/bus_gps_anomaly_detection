@@ -36,3 +36,4 @@ jobs:
           docker push canerdikkollu/go-neo4j:1.0.0
           docker push canerdikkollu/go-route-creator:1.0.0
           docker push canerdikkollu/go-anomaly-detection:1.0.0
+
