@@ -21,18 +21,18 @@ jobs:
       
       - name: docker build go-neo4j
         run: |
-          docker build ./backend -t canerdikkollu/go-neo4j:1.0.0
+          docker build ./backend -t $DOCKER_USER/go-neo4j:1.0.0
           
       - name: docker build go-route-creator
         run: |
-          docker build ./backend -t canerdikkollu/go-route-creator:1.0.0
+          docker build ./backend -t $DOCKER_USER/go-route-creator:1.0.0
           
       - name: docker build go-anomaly-detection
         run: |
-          docker build ./backend -t canerdikkollu/go-anomaly-detection:1.0.0
+          docker build ./backend -t $DOCKER_USER/go-anomaly-detection:1.0.0
 
       - name: docker push
         run: |
-          docker push canerdikkollu/go-neo4j:1.0.0
-          docker push canerdikkollu/go-route-creator:1.0.0
-          docker push canerdikkollu/go-anomaly-detection:1.0.0
+          docker push $DOCKER_USER/go-neo4j:1.0.0
+          docker push $DOCKER_USER/go-route-creator:1.0.0
+          docker push $DOCKER_USER/go-anomaly-detection:1.0.0
